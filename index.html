@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Light and Shadow Mechanics Demo</title>
+    <style>
+        body { margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #333; font-family: sans-serif; color: white; }
+        canvas { background-color: #1a1a1a; border: 2px solid #555; }
+        #game-info { position: absolute; top: 10px; left: 10px; background-color: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="game-info">
+        <p>Use ARROW keys to move.</p>
+        <p>You are safe in shadow, vulnerable in light.</p>
+        <p>Enemy only chases you when you are in light!</p>
+        <p id="status-message"></p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusMessage = document.getElementById('status-message');
+
+        // Game state
+        let player = { x: 50, y: 50, size: 20, speed: 3, inLight: false };
+        let enemy = { x: 700, y: 500, size: 25, speed: 1.5 };
+        let lightSources = [
+            { x: 200, y: 150, radius: 80 },
+            { x: 600, y: 250, radius: 100 },
+            { x: 350, y: 450, radius: 70 }
+        ];
+
+        let keys = {};
+        let gameOver = false;
+
+        // Input handling
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // --- Core Mechanic: Check if player is in light --- 
+        // This function determines if the player's current position is within any light source.
+        function isPlayerInLight() {
+            for (let i = 0; i < lightSources.length; i++) {
+                const light = lightSources[i];
+                // Calculate distance from player center to light source center
+                const dx = player.x + player.size / 2 - light.x;
+                const dy = player.y + player.size / 2 - light.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // If player's bounding circle overlaps with light source circle, player is in light
+                if (distance < light.radius + player.size / 2) {
+                    return true;
+                }
+            }
+            return false; // Player is in shadow
+        }
+
+        function update() {
+            if (gameOver) return;
+
+            // Player movement
+            if (keys['ArrowUp'] && player.y > 0) player.y -= player.speed;
+            if (keys['ArrowDown'] && player.y < canvas.height - player.size) player.y += player.speed;
+            if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
+            if (keys['ArrowRight'] && player.x < canvas.width - player.size) player.x += player.speed;
+
+            // Update player's light status based on the core mechanic
+            player.inLight = isPlayerInLight();
+
+            // --- Core Mechanic: Enemy AI based on light/shadow --- 
+            // The enemy's behavior changes dynamically based on whether the player is in light or shadow.
+            if (player.inLight) {
+                // If player is in light, enemy chases them
+                statusMessage.textContent = "Status: Player is in light! Enemy is chasing!";
+                const dx = player.x - enemy.x;
+                const dy = player.y - enemy.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance > 1) {
+                    enemy.x += (dx / distance) * enemy.speed;
+                    enemy.y += (dy / distance) * enemy.speed;
+                }
+            } else {
+                // If player is in shadow, enemy stops (or could patrol randomly)
+                statusMessage.textContent = "Status: Player is in shadow. Enemy is confused.";
+            }
+
+            // Collision detection (player vs. enemy)
+            if (player.x < enemy.x + enemy.size &&
+                player.x + player.size > enemy.x &&
+                player.y < enemy.y + enemy.size &&
+                player.y + player.size > enemy.y) {
+                // Player is only caught if they are currently in a light zone
+                if (player.inLight) {
+                    gameOver = true;
+                    statusMessage.textContent = "GAME OVER! You were caught in the light!";
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw light sources
+            lightSources.forEach(light => {
+                ctx.beginPath();
+                ctx.arc(light.x, light.y, light.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 0, 0.2)'; // Semi-transparent yellow light
+                ctx.fill();
+            });
+
+            // Draw player (color changes based on light status for visual feedback)
+            ctx.fillStyle = player.inLight ? 'blue' : 'darkblue';
+            ctx.fillRect(player.x, player.y, player.size, player.size);
+
+            // Draw enemy
+            ctx.fillStyle = 'red';
+            ctx.fillRect(enemy.x, enemy.y, enemy.size, enemy.size);
+
+            if (gameOver) {
+                ctx.font = '48px Arial';
+                ctx.fillStyle = 'white';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2);
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop(); // Start the game
+    </script>
+</body>
+</html>
